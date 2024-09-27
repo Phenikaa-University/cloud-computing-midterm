@@ -7,3 +7,5 @@ torch
 opencv-python
 torchvision
 streamlit
+streamlit_drawable_canvas
+wandb
