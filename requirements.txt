@@ -1,0 +1,9 @@
+pillow
+replicate
+gradio-imageslider==0.0.13
+gradio
+numpy
+torch
+opencv-python
+torchvision
+streamlit
