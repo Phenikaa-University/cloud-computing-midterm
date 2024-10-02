@@ -28,7 +28,7 @@ def image_enhance_clarity():
             run_button = gr.Button(value="Enhance Image")
         with gr.Column():
             output_slider = ImageSlider(label="Before / After")
-    
+
     with gr.Accordion("Advanced Options", open=False):
         prompt = gr.Textbox(
             label="Prompt",
@@ -76,8 +76,10 @@ def image_enhance_clarity():
         outputs=output_slider,
     )
 
-def recognize_digit(image):
-    img = Image.open(image)
+def predict_uploaded_image(image):
+    img = Image.fromarray(image.astype('uint8'), 'RGB')
+    
+    # Save image to path
     path = {
         "images": "data/test/digit_test.png",
         "lines": "data/lines/",
@@ -86,6 +88,7 @@ def recognize_digit(image):
     img.save(path["images"])
     
     results = split_digit_from_img(path)
+    
     numbers = ""
     for img in results:
         _, binary = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY_INV)
@@ -95,13 +98,21 @@ def recognize_digit(image):
         res = predict(img)
         digit = int(res.argmax())
         numbers += str(digit)
+    
     return numbers
 
-def draw_and_recognize(canvas_image):
-    img = cv2.cvtColor(canvas_image, cv2.COLOR_BGR2GRAY)
+def predict_drawn_digit(image):
+    drawing_layer = image['layers'][0]
+    print(drawing_layer)
+    print(image )
+    # Save image to path
+    path = "Test.png"
+    cv2.imwrite(path, drawing_layer)
+    img = cv2.cvtColor(drawing_layer.astype('uint8'), cv2.COLOR_RGB2GRAY)
+    img = cv2.resize(img, (28, 28))
     res = predict(img)
     digit = int(res.argmax())
-    return digit
+    return f"Predicted Digit: {digit}"
 
 def digit_recognizer():
     gr.Markdown("## Digit Recognizer")
@@ -111,13 +122,13 @@ def digit_recognizer():
             recognize_button = gr.Button(value="Recognize Digit")
         with gr.Column():
             result_text = gr.Textbox(label="Recognized Digits", interactive=False)
-    
+
     recognize_button.click(
-        fn=recognize_digit,
+        fn=predict_uploaded_image,
         inputs=[input_image],
         outputs=[result_text],
     )
-    
+
     gr.Markdown("## Draw a Digit")
     with gr.Row():
         with gr.Column():
@@ -125,9 +136,9 @@ def digit_recognizer():
             draw_button = gr.Button(value="Recognize Drawn Digit")
         with gr.Column():
             draw_result_text = gr.Textbox(label="Recognized Digit", interactive=False)
-    
+
     draw_button.click(
-        fn=draw_and_recognize,
+        fn=predict_drawn_digit,
         inputs=[canvas],
         outputs=[draw_result_text],
     )
@@ -135,7 +146,7 @@ def digit_recognizer():
 def image_generator_flux():
     with open('services/loras.json') as f:
         loras = json.load(f)
-    
+
     MAX_SEED = 2**32 - 1
 
     def update_selection(evt: gr.SelectData, width, height):
@@ -161,16 +172,16 @@ def image_generator_flux():
     def run_lora(prompt, steps, selected_index, randomize_seed, seed, width, height, output_format, output_quality, noI):
         if selected_index is None:
             raise gr.Error("You must select a LoRA before proceeding.")
-    
+
         selected_lora = loras[selected_index]
         hf_lora = selected_lora["repo"]
         trigger_word = selected_lora["trigger_word"]
-    
+
         if randomize_seed:
             seed = random.randint(0, MAX_SEED)
-    
+
         assetID = f"demo_{seed}"  # You might want to generate a unique ID here
-    
+
         local_paths = []
         remote_urls = []
         for _ in range(noI):
@@ -188,16 +199,16 @@ def image_generator_flux():
             )
             local_paths.append(local_path)
             remote_urls.append(remote_url)
-    
+
         return local_paths, seed, remote_urls
-    
+
     gr.Markdown("## Image Generation with Flux LoRA")
     with gr.Row():
         with gr.Column(scale=3):
             prompt = gr.Textbox(label="Prompt", lines=1, placeholder="Type a prompt after selecting a LoRA")
         with gr.Column(scale=1):
             generate_button = gr.Button("Generate", variant="primary")
-    
+
     with gr.Row():
         with gr.Column(scale=3):
             selected_info = gr.Markdown("")
@@ -207,47 +218,47 @@ def image_generator_flux():
                 allow_preview=False,
                 columns=3
             )
-    
+
         with gr.Column(scale=4):
             result = gr.Gallery(label="Generated Image")
             # Display the remote URLs of the generated images
             remote_urls = gr.Textbox(label="Remote URLs", interactive=False, lines=5)
-    
+
     with gr.Row():
         with gr.Accordion("Advanced Settings", open=False):
             with gr.Column():
                 with gr.Row():
                     steps = gr.Slider(label="Steps", minimum=1, maximum=50, step=1, value=28)
-    
+
                 with gr.Row():
                     width = gr.Slider(label="Width", minimum=256, maximum=1536, step=64, value=1024)
                     height = gr.Slider(label="Height", minimum=256, maximum=1536, step=64, value=1024)
-    
+
                 with gr.Row():
                     randomize_seed = gr.Checkbox(True, label="Randomize seed")
                     seed = gr.Slider(label="Seed", minimum=0, maximum=MAX_SEED, step=1, value=0, randomize=True)
-    
+
                 with gr.Row():
                     output_format = gr.Dropdown(["png", "jpg", "webp"], label="Output Format", value="png")
                     output_quality = gr.Slider(label="Output Quality", minimum=1, maximum=100, step=1, value=75)
-    
+
                 with gr.Row():
                     noI = gr.Slider(label="Number of Images", minimum=1, maximum=5, step=1, value=1)
-    
+
     selected_index = gr.State(None)
-    
+
     gallery.select(
         update_selection,
         inputs=[width, height],
         outputs=[prompt, selected_info, selected_index, width, height]
     )
-    
+
     generate_button.click(
         fn=run_lora,
         inputs=[prompt, steps, selected_index, randomize_seed, seed, width, height, output_format, output_quality, noI],
         outputs=[result, seed, remote_urls]
     )
-    
+
 def degit_predict():
     digit_recognizer()
 
@@ -262,17 +273,16 @@ if __name__ == "__main__":
     block = gr.Blocks(title="Cloud-computing mid-term - Vuong Tuan Cuong", css=custom_css).queue()
     with block:
         gr.HTML(title)
-        
+
         with gr.TabItem("Image Generation with Flux LoRA"):
             image_generator_flux()
-            
+
         with gr.TabItem("Image Enhancement with Clarity"):
             image_enhance_clarity()
-        
+
         with gr.TabItem("Digit Recognizer"):
             digit_recognizer()
-    
+
     block.launch(share=True)  # Set timeout to 300 seconds
-    
+
     # Load environment variables
-    
